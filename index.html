@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Hacking Web Tool</title>
+    <style>
+        /* 全体のレイアウト設定 */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* ピアノキーのスタイル設定 */
+        #piano {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        /* 鍵盤の基本スタイル */
+        .key {
+            width: 40px;
+            height: 150px;
+            border: 1px solid black;
+            margin: 0 2px;
+            cursor: pointer;
+        }
+
+        /* 白鍵のスタイル */
+        .white {
+            background-color: white;
+        }
+
+        /* 黒鍵のスタイル */
+        .black {
+            background-color: black;
+            height: 100px;
+            margin-left: -22px;
+            margin-right: -22px;
+            z-index: 1;
+            width: 30px;
+        }
+
+        /* コントロールパネルのスタイル */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* スライダー周りのスタイル */
+        .slider-container {
+            display: flex;
+            align-items: center;
+        }
+        .slider-container label {
+            width: 150px;
+        }
+    </style>
+</head>
+
+<body>
+<h2>Music Hacking Web Tool </h2>
+<!-- ピアノキー表示領域 -->
+<div id="piano"></div>
+<br><br><br><br>
+
+<div class="controls">
+    <!-- MIDI デバイス選択 -->
+    <div>
+        <label for="midiInput">MIDI Input:</label>
+        <select id="midiInput"></select>
+    </div>
+    <div>
+        <label for="midiOutput">MIDI Output:</label>
+        <select id="midiOutput"></select>
+    </div>
+    <div>
+        <label for="webMidiLinks">Web MIDI Links:</label>
+        <select id="webMidiLinks"></select>
+    </div>
+    <!-- MIDI設定 -->
+    <div>
+        <label for="midiChannel">MIDI Channel:</label>
+        <select id="midiChannel"></select>
+    </div>
+    <div>
+        <label for="instrument">Instrument:</label>
+        <select id="instrument"></select>
+    </div>
+
+    <!-- 各種パラメータ調整スライダー -->
+    <div class="slider-container">
+        <label for="octave">Octave (1-6):</label>
+        <input type="range" id="octave" min="1" max="6" value="4">
+        <span id="octaveValue">4</span>
+    </div>
+    <div class="slider-container">
+        <label for="transpose">Key Transpose (-12 to +12):</label>
+        <input type="range" id="transpose" min="-12" max="12" value="0">
+        <span id="transposeValue">0</span>
+    </div>
+    <div class="slider-container">
+        <label for="volume">Volume (0-127):</label>
+        <input type="range" id="volume" min="0" max="127" value="100">
+        <span id="volumeValue">100</span>
+    </div>
+    <br><br><br> ↓ 工事中 <br>
+    <div class="slider-container">
+        <label for="chorus">Chorus (0-100):</label>
+        <input type="range" id="chorus" min="0" max="100" value="10">
+        <span id="chorusValue">10</span>
+    </div>
+    <div class="slider-container">
+        <label for="reverb">Reverb (0-100):</label>
+        <input type="range" id="reverb" min="0" max="100" value="10">
+        <span id="reverbValue">10</span>
+    </div>
+    <div class="slider-container">
+        <label for="delay">Delay (0-100):</label>
+        <input type="range" id="delay" min="0" max="100" value="10">
+        <span id="delayValue">10</span>
+    </div>
+</div>
+
+<!-- 内蔵シンセサイザー -->
+<webaudio-tinysynth id="tinysynth"></webaudio-tinysynth>
+
+<!-- 必要なライブラリの読み込み -->
+<script src="https://unpkg.com/@webcomponents/custom-elements"></script>
+<script src="https://g200kg.github.io/webaudio-controls/webaudio-controls.js" ></script>
+<script src="https://g200kg.github.io/webaudio-tinysynth/webaudio-tinysynth.js"></script>
+
+<script>
+    let midiAccess = null;
+    let currentMIDIInput = null;
+    let currentMIDIOutput = null;
+    let currentMIDIChannel = 0;
+    let currentInstrument = 0;
+    let currentNote=60;
+    let currentOctv=4;
+    let currentTranspose=0;
+    let currentVol=100;
+    let isSustain = false;
+    let currentNumPad=0;				// Later
+    let varNumPadArr = new Array();		// Later
+    let audioContext = null;
+    let oscillator = null;
+    let lnkSyn = null;
+
+    //**************** Key Mapping ****************  <- Remake this later !?
+    const keyMapping = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    const noteMapping = {
+        'z': 12, 's': 13, 'x': 14, 'd': 15, 'c': 16, 'v': 17, 'g': 18, 'b': 19, 'h': 20, 'n': 21, 'j': 22, 'm': 23,
+        ',': 24, '<': 24, 'l': 25, '.': 26, '>': 26, ';': 27, '+': 27, '/': 28, '?': 28, '\\': 29, '_': 29, ']': 30, '}': 30, 
+        '1': 30, '!': 30, 'q': 31, '2': 32, '"': 32, 'w': 33, '3': 34, '#': 34, 'e': 35, 
+        'r': 36, '5': 37, '%': 37, 't': 38, '6': 39, '&': 39, 'y': 40, 'u': 41, '8': 42, '(': 42, 'i': 43, '9': 44, ')': 44, 'o': 45, '0': 46, 'p': 47, 
+        '@': 48, '`': 48, '^': 49, '~': 49, '[': 50, '{': 50, '|': 51			//, '\\': 51
+    };
+
+/*    const noteMapping = {		// 2024/11/13 Changed
+        'z': 36, 's': 37, 'x': 38, 'd': 39, 'c': 40, 'v': 41, 'g': 42, 'b': 43, 'h': 44, 'n': 45, 'j': 46, 'm': 47,
+        ',': 48, 'l': 49, '.': 50, ';': 51, '/': 52, ']': 53, '1': 54, 'q': 55, '2': 56, 'w': 57, '3': 58, 'e': 59, 
+        'r': 60, '5': 61, 't': 62, '6': 63, 'y': 64, 'u': 65, '8': 66, 'i': 67, '9': 68, 'o': 69, '0': 70, 'p': 71, 
+        '@': 72, '^': 73, '[': 74, '\\': 75
+    };
+*/
+    const instruments = [
+        "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano",
+        "Electric Piano 1", "Electric Piano 2", "Harpsichord", "Clavinet",
+        // ... (他の音色を追加)
+        "Gunshot"
+    ];
+
+    //**************** WebMidiLink List ****************
+    // See this!! https://www.g200kg.com/en/docs/webmidilink/
+    const webMidiLinks = [
+        { name: "-" },
+        { name: "G200kg's GMPlayer", url: "http://www.g200kg.com/webmidilink/gmplayer/" },
+        { name: "MidiDevDrive (Local Midi device driver)", url: "http://www.g200kg.com/webmidilink/mididevdrive/" },
+        { name: "WebModular", url: "http://www.g200kg.com/webmidilink/webmodular/" },
+        { name: "Aike WebSynth", url: "http://aikelab.net/websynth/" },
+        { name: "WebFMsynthesizer", url: "http://www.taktech.org/takm/WebFMSynth/" },
+//            { name: "Web MIDI Editor", url: "https://webmidieditor.com/" },
+//            { name: "MIDI Player", url: "https://midi-player.web.app/" },
+        // 他のWeb MIDI Linkを追加
+    ];
+
+	// init *********************************** 
+    window.onload = initApp;
+
+    function initApp() {
+        createPianoKeys();
+        setupMIDI();
+
+        //**************** DefaultWebMidiLink ****************
+//        lnkSyn = new LnkSynth();
+//        lnkSyn.Load('http://www.g200kg.com/webmidilink/gmplayer/')
+
+        currentMIDIOutput = document.getElementById("tinysynth");
+        //await currentMIDIOutput.ready();
+
+        const instrumentSelect = document.getElementById('instrument');
+        for (var i=0; i<128; ++i){
+          var o=document.createElement("option");
+          o.innerHTML=(i+1)+" : "+currentMIDIOutput.getTimbreName(0,i);
+          document.getElementById('instrument').appendChild(o);
+        }
+        //instruments.forEach((instrument, index) => {
+        //    const option = new Option(instrument, index);
+        //    instrumentSelect.add(option);
+        //});
+        instrumentSelect.onchange = changeInstrument;
+        currentMIDIOutput.send([0xC0 + currentMIDIChannel, currentInstrument]);		//2025/11/18
+        currentMIDIOutput.setReverbLev(0.9);			//2025/12/10
+
+        const midiChannelSelect = document.getElementById('midiChannel');
+        for (let i = 1; i <= 16; i++) {
+            midiChannelSelect.add(new Option(`Channel ${i}`, i - 1));
+        }
+        midiChannelSelect.onchange = (e) => { currentMIDIChannel = parseInt(e.target.value); };
+
+        //**************** WebMidiLink Selector ****************
+        const webMidiLinksSelect = document.getElementById('webMidiLinks');
+        webMidiLinks.forEach((link, index) => {
+            webMidiLinksSelect.add(new Option(link.name, index));
+        });
+        webMidiLinksSelect.onchange = (e) => {
+            const selectedLink = webMidiLinks[e.target.value];
+            // See this!! WebMidiLink sender:  https://www.g200kg.com/en/docs/webmidilink/spec.html
+            currentMIDIOutput = null;
+            lnkSyn =null;
+            lnkSyn = new LnkSynth();
+            lnkSyn.Load(selectedLink.url)
+            // window.open(selectedLink.url, 'sy1','width=900,height=670,scrollbars=yes,resizable=yes');	// '_blank');
+        };
+
+        function LnkSynth() {
+            this.sy = null;
+            this.Load = function(url) {
+                this.sy = window.open(url, "sy1", "width=900,height=670,scrollbars=yes,resizable=yes");
+            }
+            this.NoteOn = function(note, velo) {
+                this.SendMessage(this.sy, "midi,90," + note.toString(16) + "," + velo.toString(16));
+            }
+            this.NoteOff = function(note) {
+                this.SendMessage(this.sy, "midi,80," + note.toString(16) + ",0");
+            }
+            this.AllSoundOff = function() {
+                this.SendMessage(this.sy, "midi,b0,78,0");
+            }
+            this.SendMessage = function(sy, s) {
+                if(this.sy)
+                    this.sy.postMessage(s, "*");
+            }
+        }
+
+        // スライダーのイベントリスナーを設定
+        ['octave', 'transpose', 'volume', 'chorus', 'reverb', 'delay'].forEach(id => {
+            const slider = document.getElementById(id);
+            slider.oninput = () => updateSliderValue(id, `${id}Value`);
+        });
+
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+
+        console.log('Application initialized');
+    }
+
+    // See the style: #piano ****************
+    function createPianoKeys() {
+        const piano = document.getElementById('piano');
+        // 4オクターブ分（48鍵）のピアノキーを生成
+        for (let i = 0; i < 48; i++) {
+            const key = document.createElement('div');
+            key.className = `key ${keyMapping[i % 12].includes('#') ? 'black' : 'white'}`;
+            key.dataset.note = i + 12;
+            //key.dataset.note = i + 36;			// 2024/11/13 Changed 
+
+            // マウスとタッチイベントの設定
+            key.addEventListener('mousedown', MIDI_NOTE_ON);
+            key.addEventListener('mouseup', MIDI_NOTE_OFF);
+            key.addEventListener('touchstart', MIDI_NOTE_ON);
+            key.addEventListener('touchend', MIDI_NOTE_OFF);
+            piano.appendChild(key);
+        }
+    }
+
+    // Web MIDI APIのセットアップ
+    async function setupMIDI() {
+        try {
+            midiAccess = await navigator.requestMIDIAccess({ sysex: true });
+            updateDeviceLists();						// 2024/11/13	<- no need ??
+            midiAccess.onstatechange = updateDeviceLists;
+            console.log('MIDI Access:', midiAccess);
+        } catch (error) {
+            console.error("MIDI access denied:", error);
+            alert("MIDI機能へのアクセスが拒否されました。ブラウザの設定を確認してください。");
+        }
+    }
+
+    // MIDIデバイスリストの更新
+    function updateDeviceLists() {
+        const inputSelect = document.getElementById('midiInput');
+        const outputSelect = document.getElementById('midiOutput');
+
+        // 入力デバイスリストの更新
+        inputSelect.innerHTML = '<option value="">None</option>';
+        midiAccess.inputs.forEach((input) => {
+            const option = new Option(input.name, input.id);
+            inputSelect.add(option);
+        });
+
+        // 出力デバイスリストの更新
+        outputSelect.innerHTML = '<option value="">webaudio-tinysynth</option>';
+        //outputSelect.innerHTML = '<option value="">None</option>';
+
+        midiAccess.outputs.forEach((output) => {
+            const option = new Option(output.name, output.id);
+            outputSelect.add(option);
+        });
+
+        // イベントハンドラの設定
+        inputSelect.onchange = changeMIDIInput;
+        outputSelect.onchange = changeMIDIOutput;
+
+        console.log('MIDI Inputs:', midiAccess.inputs);
+        console.log('MIDI Outputs:', midiAccess.outputs);
+    }
+
+    // MIDI入力デバイスの変更処理
+    function changeMIDIInput(event) {
+        if (currentMIDIInput) {
+            currentMIDIInput.onmidimessage = null;
+        }
+        const id = event.target.value;
+        if (id !== "") {
+            currentMIDIInput = midiAccess.inputs.get(id);
+            currentMIDIInput.onmidimessage = handleMIDIMessage;
+        }
+    }
+
+    // MIDI出力デバイスの変更処理
+	    //???????? Remake this later,  See Jazz-Plugin download https://jazz-soft.net/ ************
+    function changeMIDIOutput(event) {
+        const id = event.target.value;
+        if (id !== "") {
+            currentMIDIOutput = midiAccess.outputs.get(id);
+        } else {
+            currentMIDIOutput = null;
+        }
+    }
+
+    // MIDIメッセージの処理
+    function handleMIDIMessage(message) {
+        const [status, note, velocity] = message.data;
+
+        // ノートオンメッセージ（ベロシティ > 0）
+        if (status === 144 && velocity > 0) {
+            MIDI_NOTE_ON({ target: { dataset: { note } } });
+
+        // ノートオフメッセージまたはベロシティ0のノートオン
+        } else if (status === 128 || (status === 144 && velocity === 0)) {
+            MIDI_NOTE_OFF({ target: { dataset: { note } } });
+        }
+    }
+
+    //**************** NOTE-ON ****************
+    function MIDI_NOTE_ON(event) {
+        const note = parseInt(event.target.dataset.note)
+                   + (12*currentOctv)
+                   + currentTranspose;
+        const velocity = 127;
+
+        if (currentMIDIOutput) {
+            currentMIDIOutput.send([0x90 + currentMIDIChannel, note, velocity]);
+        } else {
+            lnkSyn.NoteOn(note,100);
+            // OSC_NOTE_ON(note);
+        }
+        if (event.target.style) {
+            event.target.style.backgroundColor = 'lightblue';
+        }
+    }
+    //**************** NOTE-OFF ****************
+    function MIDI_NOTE_OFF(event) {
+        const note = parseInt(event.target.dataset.note)
+                   + (12*currentOctv)
+                   + currentTranspose;
+
+        if (currentMIDIOutput) {
+            currentMIDIOutput.send([0x80 + currentMIDIChannel, note, 0]);
+        } else {
+            lnkSyn.NoteOff(note);
+            // OSC_NOTE_OFF();
+        }
+        // 押されたキーの視覚的なフィードバック
+        if (event.target.style) {
+            event.target.style.backgroundColor = '';
+        }
+    }
+
+    //**************** OSC_NOTE_ON ****************
+    function OSC_NOTE_ON(note) {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const frequency = 440 * Math.pow(2, (note - 69) / 12);
+        oscillator = audioContext.createOscillator();
+        oscillator.type = 'sine';						// saw, square
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        oscillator.connect(audioContext.destination);
+        oscillator.start();
+    }
+    //**************** OSC_NOTE_OFF ****************
+    function OSC_NOTE_OFF() {
+        if (oscillator) {
+            oscillator.stop();
+            oscillator.disconnect();
+        }
+    }
+
+    function updateSliderValue(sliderId, valueId) {
+        const slider = document.getElementById(sliderId);
+        const valueSpan = document.getElementById(valueId);
+        valueSpan.textContent = slider.value;
+        
+        switch (sliderId) {
+            case 'octave':
+                currentOctv = parseInt(document.getElementById('octave').value);
+                break;
+            case 'transpose':
+                currentTranspose = parseInt(document.getElementById('transpose').value);
+                break;
+            case 'volume':
+                currentVol = parseInt(document.getElementById('volume').value);
+                break;
+        }
+
+        if (currentMIDIOutput) {
+            let controlNumber;
+            switch (sliderId) {
+                case 'volume':
+                    controlNumber = 7;
+                    break;
+                case 'chorus':
+                    controlNumber = 93;
+                    break;
+                case 'reverb':
+                    controlNumber = 91;
+                    break;
+                case 'delay':
+                    controlNumber = 94;
+                    break;
+            }
+            if (controlNumber) {
+                currentMIDIOutput.send([0xB0 + currentMIDIChannel, controlNumber, parseInt(slider.value)]);
+            }
+        }
+    }
+
+    //**************** Timbre ****************
+    function changeInstrument() {
+        currentInstrument = parseInt(document.getElementById('instrument').value);
+        if (currentMIDIOutput) {
+            currentMIDIOutput.send([0xC0 + currentMIDIChannel, currentInstrument]);
+        } else {
+            // currentInstrument
+        }
+    }
+
+    //**************** Key events ****************
+    function handleKeyDown(event) {
+        if (event.repeat) return;		// <- Important!!
+        
+        const key = event.key.toLowerCase();
+        // Keys for a note ********
+        if (key in noteMapping) {
+            MIDI_NOTE_ON({ target: { dataset: { note: noteMapping[key] } } });
+
+        // Other Keys ********
+        } else {
+            // Octave Down
+           if((event.keyCode==37 || event.keyCode==65) && currentOctv>1) {		// <- || A
+             currentOctv = currentOctv - 1;
+             //let octv = document.getElementById("octave");
+             octave.value = currentOctv;
+             octaveValue.textContent = currentOctv;
+             console.log("Oct: " + currentOctv);
+            // Octave Up
+           } else if ((event.keyCode==39 || event.keyCode==70) && currentOctv<6) {		// -> || F
+             currentOctv = currentOctv + 1;
+             octave.value = currentOctv;
+             octaveValue.textContent = currentOctv;
+             console.log("Oct: " + currentOctv);
+           
+           // Key Transpose Down
+           } else if ((event.keyCode==109 || event.keyCode==34) && currentTranspose>-12) {		// PgDn || -
+             currentTranspose = currentTranspose - 1;
+             transpose.value  = currentTranspose;
+             transposeValue.textContent = currentTranspose;
+             console.log("Trns: " + currentTranspose);
+           // Key Transpose Up
+           } else if ((event.keyCode==107 || event.keyCode==33) && currentTranspose<12) {		// PgUp || +
+             currentTranspose = currentTranspose + 1;
+             transpose.value  = currentTranspose;
+             transposeValue.textContent = currentTranspose;
+             console.log("Trns: " + currentTranspose);
+           // Key Transpose Reset
+           } else if (event.keyCode==106 || event.keyCode==36) { // Home || *
+             currentTranspose = 0;
+             transpose.value  = currentTranspose;
+             transposeValue.textContent = currentTranspose;
+             console.log("Trns: " + currentTranspose);
+
+           } else if (event.ctrlKey){ // Ctr+Space
+             if(event.keyCode==32){			// Ctr+Space: Play
+               //fnPlay();
+             }
+           } else if (event.ctrlKey || event.altKey){ // Ctr+Alt
+             if(event.keyCode==80){			// Ctr+Alt+"p": Panic!
+               //fnPanic();
+             }
+
+           // Sustain-On
+           //} else if (event.keyCode==16 || event.keyCode==240){	// Shift || CapsLock: Sustain
+           }else if(event.keyCode==16 || event.getModifierState("CapsLock")){	// Shift || CapsLock: Sustain
+             isSustain = true;
+           }
+       }
+    }
+
+    function handleKeyUp(event) {
+       // Sustain-Off
+       if (event.keyCode==16){	// Shift
+         isSustain = false;
+       }
+       // If Sustain-On
+       if (isSustain==true || event.getModifierState("CapsLock")){		//2025/11/18
+       //if (isSustain==true){
+         return;
+       }
+        const key = event.key.toLowerCase();
+        if (key in noteMapping) {
+            MIDI_NOTE_OFF({ target: { dataset: { note: noteMapping[key] } } });
+        }
+    }
+
+</script>
+</body>
+</html>
