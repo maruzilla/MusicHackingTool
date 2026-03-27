@@ -67,20 +67,7 @@
 <h2>Music Hacking Web Tool </h2>
 <!-- ピアノキー表示領域 -->
 <div id="piano"></div>
-
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-<br/><br/><br/><br/>
-
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 <div class="controls">
     <!-- MIDI デバイス選択 -->
     <div>
@@ -142,10 +129,6 @@
 <!-- 内蔵シンセサイザー -->
 <webaudio-tinysynth id="tinysynth"></webaudio-tinysynth>
 
-<br/>
-<div>OS: <span id="os"></span></div>
-<div>Browser: <span id="browser"></span></div>
-
 <!-- 必要なライブラリの読み込み -->
 <script src="https://unpkg.com/@webcomponents/custom-elements"></script>
 <script src="https://g200kg.github.io/webaudio-controls/webaudio-controls.js" ></script>
@@ -167,31 +150,10 @@
     let audioContext = null;
     let oscillator = null;
     let lnkSyn = null;
-    let osName = null;
-    let browserNames = null;
-    let browserName = null;
-    
-    if (navigator.userAgentData) {
-      // OS名（プラットフォーム）の取得
-      console.log(navigator.userAgentData.platform); // "Windows" など
-      osName = navigator.userAgentData.platform;
-      document.getElementById("os").textContent = osName;
-      // ブラウザ名の取得
-      console.log(navigator.userAgentData.brands);
-      browserNames = navigator.userAgentData.brands;		// ブラウザ名配列
-      browserName = browserNames[browserNames.length - 1].brand;
-      document.getElementById("browser").textContent = browserName;		// .innerText
-    }
 
     //**************** Key Mapping ****************  <- Remake this later !?
     const keyMapping = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     
-    if (osName.toLowerCase().includes("ios")) {
-      document.getElementById("os").textContent = osName;
-    } else {
-      document.getElementById("os").textContent = osName + ": Other OS";
-    }
-
     const noteMapping = {
         'z': 12, 's': 13, 'x': 14, 'd': 15, 'c': 16, 'v': 17, 'g': 18, 'b': 19, 'h': 20, 'n': 21, 'j': 22, 'm': 23,
         ',': 24, '<': 24, 'l': 25, '.': 26, '>': 26, ';': 27, '+': 27, '/': 28, '?': 28, '\\': 29, '_': 29, ']': 30, '}': 30, 
