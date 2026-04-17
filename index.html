@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Hacking Web Tool</title>
+    <title>Music Hacking Tool</title>
     <style>
         /* 全体のレイアウト設定 */
         body {
@@ -64,7 +64,7 @@
 </head>
 
 <body>
-<h2>Music Hacking Web Tool </h2>
+<h2>Music Hacking Tool </h2>
 <!-- ピアノキー表示領域 -->
 <div id="piano"></div>
 
@@ -108,7 +108,7 @@
     <div class="slider-container">
         <label for="volume">Volume (0-127):</label>
         <input type="range" id="volume" min="0" max="127" value="100">
-        <span id="volumeValue">100</span>
+        <span id="volumeValue">75</span>
     </div>
     <br><br><br> ↓ 工事中 <br>
     <div class="slider-container">
@@ -141,11 +141,11 @@
     let currentMIDIInput = null;
     let currentMIDIOutput = null;
     let currentMIDIChannel = 0;
-    let currentInstrument = 0;
+    let currentInstrument = 1;
     let currentNote=60;
-    let currentOctv=4;
+    let currentOctv=3;
     let currentTranspose=0;
-    let currentVol=100;
+    let currentVol=75;
     let isSustain = false;
     let currentNumPad=0;				// Later
     let varNumPadArr = new Array();		// Later
@@ -206,6 +206,7 @@
         currentMIDIOutput = document.getElementById("tinysynth");
         //await currentMIDIOutput.ready();
 
+        //document.getElementById('instrument') = 0;
         const instrumentSelect = document.getElementById('instrument');
         for (var i=0; i<128; ++i){
           var o=document.createElement("option");
@@ -218,7 +219,7 @@
         //});
         instrumentSelect.onchange = changeInstrument;
         currentMIDIOutput.send([0xC0 + currentMIDIChannel, currentInstrument]);		//2025/11/18
-        currentMIDIOutput.setReverbLev(0.9);			//2025/12/10
+        currentMIDIOutput.setReverbLev(0.4);			//2025/12/10
 
         const midiChannelSelect = document.getElementById('midiChannel');
         for (let i = 1; i <= 16; i++) {
